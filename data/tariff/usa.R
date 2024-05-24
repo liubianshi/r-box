@@ -3,7 +3,7 @@ box::use(stringr)
 box::use(data.table[...])
 
 NUTSTORE <- Sys.getenv("NUTSTORE")
-DATA_LIB <- file.path(NUTSTORE, "Data", "国际数据") 
+DATA_LIB <- file.path(NUTSTORE, "Data", "国际数据")
 tariff <- list(
     china_extra = file.path(
         DATA_LIB,

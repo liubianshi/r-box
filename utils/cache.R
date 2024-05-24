@@ -1,7 +1,7 @@
 #' @export
-Result <- function(expressions, cache, update = FALSE) {
+result <- function(expressions, filename, update = FALSE) {
     expressions <- substitute(expressions)
-    path <- file.path(".cache", cache)
+    path <- file.path("cache", filename)
     if (file.exists(path) && isFALSE(update)) {
         return(readRDS(path))
     }
