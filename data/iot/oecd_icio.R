@@ -93,8 +93,8 @@ get_inds_export_share <- function(year, country = "World") {
 get_inds_output <- function(year, country = "World") {
     stopifnot(all(year >= YEAR_BEGIN & year <= YEAR_END))
     ori_data_path <- file.path(DATA_LIB, "sources", "X.RData")
-
     load(ori_data_path)
+
     X <- t(ICIO2023econX) %>% as.data.table(keep.rownames = TRUE)
     X[, c("country", "inds") := as.data.table(stringr::str_split_fixed(rn, "_", 2))]
     X <- X[, .SD, .SDcols = c("country", "inds", year)]
@@ -149,6 +149,21 @@ get_conversion_table_icio_isic4 <- function() {
     return(table)
 }
 
+#' @export
+get_country_list <- function() {
+    DATA_LIB <- file.path(Sys.getenv("DATA_LIB"), "Sync_Data", "OECD_ICIO_2023")
+    ori_data_path <- file.path(DATA_LIB, "sources", "ReadMe_ICIO_Robjects for time series analysis.xlsx")
+    data <- local({
+        ori <- list(path = ori_data_path,  sheet = "Country_Industry", col_names = FALSE)
+        purrr::map(c("C4:D43", "F4:G43"), ~ do.call(readxl::read_xlsx, c(ori, range = .x))) %>%
+        data.table::rbindlist() %>%
+        data.table::setnames(c("country_iso", "country_name"))
+    })
+    new <- c("BGD", "BLR", "CMR", "CIV", "EGY", "JOR", "NGA", "PAK", "SEN", "UKR")
+    data[, new := country_iso %in% new]
+}
+
+
 #' Generate Industry-specific Input-Output Table
 #'
 #' This function generates an industry-specific input-output table based on the given input-output table.
@@ -162,17 +177,25 @@ get_conversion_table_icio_isic4 <- function() {
 #' gen_industry_iot(wiot)
 #'
 #' @export
-gen_industry_iot <- function(wiot) {
+gen_industry_iot <- function(year) {
+    stopifnot(length(year) == 1)
+    load(file.path(DATA_LIB, "sources", "Z.RData"))
+    wiot <- ICIO2023econZ[match(year, attr(ICIO2023econZ, "dimnames")[[1]]), , ]
+
     sector_list <-
         stringr::str_replace_all(attr(wiot, "dimnames")[[2]], "(\\w+)_(\\w+)", "\\2") %>%
         unique()
     names(sector_list) <- sector_list
-    multi_combine_column <- purrr::map_dfc(sector_list, ~ {
-        stringr::str_detect(attr(wiot, "dimnames")[[2]], sprintf("_%s$", .x)) %>%
+    multi_combine_column <- sector_list %>%
+        purrr::map_dfc(~ {
+            stringr::str_detect(attr(wiot, "dimnames")[[2]], sprintf("_%s$", .x)) %>%
             as.integer()
-    }) %>%
+        }) %>%
         as.matrix()
-    t(multi_combine_column) %*% wiot %*% multi_combine_column
+    m <- t(multi_combine_column) %*% wiot %*% multi_combine_column
+    rownames(m) <- names(sector_list)
+    colnames(m) <- names(sector_list)
+    return(m)
 }
 
 
@@ -182,13 +205,21 @@ gen_industry_iot <- function(wiot) {
 #'
 #' @param iiot Input data, a matrix or data frame
 #' @return Coefficient table
-#' @export
 #'
 #' @examples
 #' iiot <- matrix(c(1, 2, 3, 4, 5, 6), nrow = 2)
 #' gen_coef_table(iiot)
-gen_coef_table <- function(iiot) {
+#' @export
+gen_coef_table <- function(iiot = NULL, year = NULL) {
+    stopifnot(! (is.null(iiot) && is.null(year)))
+    if (is.null(iiot)) iiot <- gen_industry_iot(year)
+    rnames <- rownames(iiot)
+    cnames <- colnames(iiot)
     as_input_total <- apply(iiot, 1, sum)
     multi <- diag(1 / as_input_total, dim(iiot)[1])
-    multi %*% iiot
+    m <- multi %*% iiot
+    m[is.nan(m)] <- 0
+    rownames(m) <- rnames
+    colnames(m) <- cnames
+    m
 }

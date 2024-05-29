@@ -23,7 +23,6 @@ china_extra <- function(hs = 6) {
     } else {
         readRDS(file.path(tariff$china_extra, "weighted_tariff_add_2018-2020.Rds"))
     }
-    
+
     return(data)
 }
-
