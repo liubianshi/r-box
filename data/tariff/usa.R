@@ -26,3 +26,13 @@ china_extra <- function(hs = 6) {
 
     return(data)
 }
+
+#' HS 6-digit coded products are categorized into five groups based on the
+#' U.S. tariffs imposed on products from China
+#'
+#' @export
+categorize_products <- function() {
+  box::use(qs[qread])
+  file.path(tariff$china_extra, "hs6_category_by_usa_tariff.qs") %>%
+  qread()
+}

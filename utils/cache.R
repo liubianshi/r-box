@@ -23,7 +23,11 @@ result <- function(expressions, filename, update = FALSE) {
 
 #' Cache regression table
 #' @export
-estout <- function(sourcefile, outfile, update = FALSE) {
+estout <- function(sourcefile, outfile = NULL, update = FALSE) {
+  if (is.null(outfile)) {
+    outfile <- gettextf("table_%s", sub("\\.[Rr]$", ".qs", basename(sourcefile)))
+  }
+
   if (grepl("\\.rds$", outfile, ignore.case = TRUE)) {
     readfile <- readRDS
     writefile <- saveRDS 
@@ -32,6 +36,7 @@ estout <- function(sourcefile, outfile, update = FALSE) {
     readfile <- qs$qread 
     writefile <- qs$qsave
   }
+
   path <- file.path("cache", "out", outfile)
   if (file.exists(path) && isFALSE(update)) {
       return(do.call(readfile, list(path)))
