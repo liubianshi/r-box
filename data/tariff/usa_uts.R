@@ -1,36 +1,85 @@
-box::use(magrittr[`%>%`, `%<>%`, `%T>%`])
 box::use(stringr[glue = str_glue, str_match_all, str_detect])
+box::use(magrittr[`%>%`, `%<>%`, `%T>%`])
 box::use(data.table[setDT, as.data.table, data.table, setnames])
 box::use(purrr)
 box::use(jsonlite[fromJSON])
-box::use(httr)
+box::use(httr[GET, status_code, content])
+box::use(rlang[list2])
+box::use(rvest[read_html, html_elements, html_attr])
 
 CACHE_PATH <- file.path(Sys.getenv("NUTSTORE"), "Data", "CACHE", "USA_HTS")
 dir.create(CACHE_PATH, showWarnings = FALSE, recursive = TRUE, mode = "0777")
-BASE_URL <- "https://www.usitc.gov/sites/default/files/tata/hts"
+BASE_URL <- "https://catalog.data.gov/dataset"
+TARIFF_LIST <- c(
+  "9903.88.01",
+  "9903.88.02",
+  "9903.88.03",
+  "9903.88.15",
+  "9903.88.16"
+)
 
-gen_filename <- function(year, vesion) {
-  gettextf(
-    'hts_%s_revision_%s_json.json',
-    year,
-    ifelse(version == 0, "basicb", version)
-  )
+fetch_web <- function(year) {
+  url_lib <- gettextf("%s/harmonized-tariff-schedule-of-the-united-states-%s", BASE_URL, year)
+  if (year == 2022) {
+    url_lib <- gettextf("%s-%s", url_lib, "e2058")
+  }
+  response <- GET(url_lib)
+  if (status_code(response) != 200) {
+    stop("Failed to download source code: \n", url_lib)
+  }
+  content(response, as = "text", encoding = "utf-8")
 }
 
-fetch_json <- function(filename) {
-  response <- httr$GET(gettextf("%s/%s", BASE_URL, filename))
+fetch_urls <- function(web) {
+  webpage <- read_html(web)
+  links <- webpage %>% html_elements(".resource-item")
+  info <-  purrr::map_dfr(links, ~ {
+    data.table(
+      title = html_elements(.x, "a.heading") %>% html_attr("title"),
+      href = html_elements(.x, "a.btn.btn-primary") %>% html_attr("href"),
+      format = html_elements(.x, "a.btn.btn-primary") %>% html_attr("data-format")
+    )
+  })
+  setDT(info)
+  info[format == "json", .(title, href)]
+}
+
+fetch_json <- function(title, url) {
+  filename <- title %>%
+    stringr::str_replace(" \\((\\w+)\\)", ".\\1") %>%
+    stringr::str_replace("Rev\\.", "Rev") %>%
+    stringr::str_replace_all("\\s", "_") %>%
+    tolower()
+  filepath <- file.path(CACHE_PATH, filename)
+  if (file.exists(filepath)) {
+    cat("Exists: ", filename, "\n")
+    return()
+  }
+  response <- httr$GET(url)
   if (httr$status_code(response) == 200) {
-    writeBin(httr$content(response, "raw"), file.path(CACHE_PATH, filename))
+    writeBin(httr$content(response, "raw"), filepath)
     cat("Fetch Success:", filename, "\n")
-  } else {
-    stop("Fetch fail!\n", call. = FALSE)
   }
 }
 
-read_data <- function(filename) {
-  filepath <- file.path(CACHE_PATH, filename)
+update_json_cache <- function(years = 2019:2024) {
+  webs <- purrr::map(year, fetch_web)
+  urls <- purrr::map_dfr(webs, fetch_urls)
+  purrr::walk2(urls$title, urls$href, fetch_json)
+}
+
+gen_filename <- function(year, vers) {
+  gettextf(
+    "%s_hts_%s.json",
+    year,
+    ifelse(vers == 0, "basic_edition", glue("revision_{vers}"))
+  )
+}
+
+read_data <- function(year, vers) {
+  filepath <- file.path(CACHE_PATH, gen_filename(year, vers))
   if (!file.exists(filepath)) {
-    fetch_json(filename)
+    update_json_cache(year)
   }
   return(fromJSON(filepath, simplifyVector = FALSE))
 }
@@ -39,14 +88,17 @@ parse_item_china_special_tariff <- function(footnotes) {
   single_footnote <- function(fnt) {
     if (is.null(fnt) || length(fnt$columns) == 0) return("")
     if (length(fnt$columns) == 1 && fnt$columns[[1]] == "other") return("")
-    str_match_all(fnt$value, "9903\\.88\\.[0-9]{2}") %>%
-    purrr::map(~ .x[, 1]) %>%
-    purrr::flatten_chr()
+
+    fnt$value %>%
+      str_match_all("9903\\.88\\.[0-9]{2}") %>%
+      purrr::map(~ .x[, 1]) %>%
+      purrr::flatten_chr()
   }
 
-  purrr::map(footnotes, single_footnote) %>%
-  purrr::flatten_chr() %>%
-  paste0(collapse = "\t")
+  footnotes %>%
+    purrr::map(single_footnote) %>%
+    purrr::flatten_chr() %>%
+    paste0(collapse = "\t")
 }
 
 parse_item <- function(item) {
@@ -66,14 +118,30 @@ parse_item <- function(item) {
   if (str_detect(item$htsno, "^[0-9]{4}\\.[0-9]{2}\\.[0-9]{2}")) {
     dt$china_tariff <- parse_item_china_special_tariff(item$footnotes)
   }
+  dt[, tariff_list := {
+    ifelse(str_detect(china_tariff, "9903\\.88\\.01"), "9903.88.01",
+    ifelse(str_detect(china_tariff, "9903\\.88\\.02"), "9903.88.02",
+    ifelse(str_detect(china_tariff, "9903\\.88\\.03"), "9903.88.03",
+    ifelse(str_detect(china_tariff, "9903\\.88\\.15"), "9903.88.15", ""))))
+  }]
+
+  dt[, exempted := {
+    stringr::str_split(china_tariff, '\t') %>%
+    purrr::map_lgl(~ {
+      other <- setdiff(.x[str_detect(.x, "9903\\.88\\.[0-9]{2}")], TARIFF_LIST)
+      length(other) > 0
+    })
+  }]
+
   dt
 }
 
-filename <- gen_filename(2021, 0)
-jq <- read_data(filename)
+#' @export
+get_tariff_info_by <- function(year, vers = 0) {
+  purrr::map_dfr(read_data(year, vers), parse_item) %>%
+  as.data.table()
+}
 
-
-re <- purrr::map_dfr(jq, parse_item)
-re[, .N, by = china_tariff][, .(china_tariff, sort(N, TRUE))] %>% head(20)
-
+re <- get_tariff_info_by(2019)
+setDT(re)
 
