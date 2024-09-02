@@ -33,15 +33,16 @@ fetch_web <- function(year) {
 fetch_urls <- function(web) {
   webpage <- read_html(web)
   links <- webpage %>% html_elements(".resource-item")
-  info <-  purrr::map_dfr(links, ~ {
+
+  purrr::map_dfr(links, ~ {
     data.table(
-      title = html_elements(.x, "a.heading") %>% html_attr("title"),
-      href = html_elements(.x, "a.btn.btn-primary") %>% html_attr("href"),
+      title  = html_elements(.x, "a.heading") %>% html_attr("title"),
+      href   = html_elements(.x, "a.btn.btn-primary") %>% html_attr("href"),
       format = html_elements(.x, "a.btn.btn-primary") %>% html_attr("data-format")
     )
-  })
-  setDT(info)
-  info[format == "json", .(title, href)]
+  }) %>%
+  setDT() %>%
+  .[format == "json", .(title, href)]
 }
 
 fetch_json <- function(title, url) {
@@ -142,6 +143,4 @@ get_tariff_info_by <- function(year, vers = 0) {
   as.data.table()
 }
 
-re <- get_tariff_info_by(2019)
-setDT(re)
 
