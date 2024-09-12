@@ -4,6 +4,7 @@ box::use(stringr[glue = str_glue])
 box::use(data.table[setDT, as.data.table, data.table, setnames, melt])
 box::use(lbs)
 box::use(ggrepel[geom_text_repel])
+box::use(graph/ggplot2/theme)
 
 # 定义生成时间趋势图的函数
 generate_time_trend_plot <- function(data, ylist, ...) {
