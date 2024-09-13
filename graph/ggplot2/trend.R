@@ -7,6 +7,7 @@ box::use(ggrepel[geom_text_repel])
 box::use(graph/ggplot2/theme)
 
 # 定义生成时间趋势图的函数
+#' @export
 generate_time_trend_plot <- function(data, ylist, ...) {
   stopifnot(ncol(data) >= 2)
   o <- list(...)
@@ -74,25 +75,4 @@ generate_time_trend_plot <- function(data, ylist, ...) {
     labs(x = xtitle, y = title, title = title) +
     theme$minimal(background = background)
 }
-
-# box::use(data/trade/uncomtrade)
-# box::use(graph/ggplot2/theme)
-#
-# box::use(graph/ggplot2/theme)
-# box::reload(theme)
-# box
-#
-# box::reload(theme)
-# box::reload(uncomtrade)
-#
-# re <- uncomtrade$get_anual_trade_data("CHN", 2008, 2023, partner = "USA")
-# p <- re[, .(year, export = Export / 10^9, import = Import / 10^9)] %>%
-#   generate_time_trend_plot(ylist = seq(0, 600, by = 100))
-# print(p)
-#
-#
-# re <- uncomtrade$get_anual_trade_data("CHN", 2008, 2023)
-# p <- re[, .(year, export = Export / 10^9, import = Import / 10^9)] %>%
-#   generate_time_trend_plot(ylist = seq(1000, 4000, by = 1000))
-# print(p)
 

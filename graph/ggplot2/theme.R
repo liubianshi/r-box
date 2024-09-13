@@ -1,6 +1,7 @@
 box::use(ggplot2[...])
 box::use(ggtext[element_markdown])
 
+
 #' @export
 minimal <- function(font = "Lato", background = "grey98", ...) {
   theme_minimal(base_family = font) +

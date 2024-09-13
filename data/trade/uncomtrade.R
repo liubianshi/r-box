@@ -4,7 +4,6 @@ box::use(data.table[setDT, as.data.table, data.table, setnames])
 box::use(comtradr)
 box::use(concordance[concord])
 
-
 #' @export
 get_monthly_trade_data <- function(reporter, start, end,
                                    flow = c("Export", "Import"),
