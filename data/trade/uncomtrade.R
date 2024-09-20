@@ -41,6 +41,11 @@ get_anual_trade_data <- function(reporter, start, end,
                                  flow = c("Export", "Import"),
                                  partner = "World",
                                  verbose = TRUE) {
+  reporter_is_world <- FALSE
+  if (length(reporter) == 1 && toupper(reporter) %in% c("WORLD", "WLD")) {
+    reporter <- "all_countries"
+    reporter_is_world <- TRUE
+  }
   datalist <- vector('list', ceiling((end - start + 1) / 12))
   for (i in seq_along(datalist)) {
     datalist[[i]] <-
@@ -61,8 +66,14 @@ get_anual_trade_data <- function(reporter, start, end,
         flow = flow_desc, value    = primary_value
       )]
   }
-  data.table::rbindlist(datalist) %>%
-  data.table::dcast(reporter + partner + year ~ flow)
+  re <- data.table::rbindlist(datalist)
+  if (reporter_is_world) {
+    re <- re[,
+      .(reporter = "WLD", value = sum(value, na.rm = TRUE)),
+      by = .(partner, year, flow)
+    ]
+  }
+  data.table::dcast(re, reporter + partner + year ~ flow)
 }
 
 #' @export
