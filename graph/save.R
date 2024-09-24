@@ -5,7 +5,11 @@ box::use(utils/file)
 gg <- function(...) {
   args <- list(...)
   fn <- do.call(ggsave, args)
-  file$push(file, force = TRUE)
+  if (Sys.getenv("SSH_TTY") == "") {
+    system2(Sys.getenv('OPENER'), fn, wait = FALSE)
+  } else{
+    file$push(fn, force = TRUE)
+  }
   return(fn)
 }
 
