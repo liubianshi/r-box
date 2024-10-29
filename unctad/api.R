@@ -25,6 +25,12 @@ get_index_meta <- function(x) {
       compute = "round(M5011/Value div 1, 3)",
       name = "Percentage_of_total_world"
     ),
+    trade_value = , US_at_current_prices = list(
+      url = "https://unctadstat-user-api.unctad.org/US.TradeMerchTotal/cur/Facts?culture=en",
+      field = "M0100",
+      compute = "M0100/Value",
+      name = "US_at_current_prices"
+    ),
     NULL
   )
 }

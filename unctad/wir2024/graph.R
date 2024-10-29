@@ -1,15 +1,17 @@
 box::use(ggplot2[...])
+hicolor <- "#FFB300"
 
 #' @export
 connected <- function(data, title = "", ytitle = "Billion U.S. Dollar",
-                      x1 = 1990, x2 = 2023) {
+                      x1 = 1990, x2 = 2024) {
         box::use(ggplot2[...])
     box::use(hrbrthemes[...])
     box::use(ggrepel[...])
 
     ggplot(data, aes(x = x, y = y)) +
-                geom_line(color = "grey") +
-        geom_point(shape = 21, color = "black", fill = "#69b3a2", size = 2) +
+        geom_line(color = "grey", linewidth = 0.3) +
+        geom_point(shape = 21, color = "white", fill = "white", size = 2) +
+        geom_point(shape = 21, color = hicolor, fill = hicolor, size = 1) +
         scale_x_continuous(breaks = seq(x1, x2, 2)) +
         geom_text_repel(data = data[x >= 2017], aes(label = sprintf("%4.1f", y)), size = 2) +
         ggtitle(title) + xlab("") + ylab(ytitle) +
