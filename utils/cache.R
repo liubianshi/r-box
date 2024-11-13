@@ -1,25 +1,38 @@
+box::use(fs)
+
 #' Cache normal result
 #' @export
 result <- function(expressions, filename, update = FALSE) {
   if (grepl("\\.rds$", filename, ignore.case = TRUE)) {
     readfile <- readRDS
-    writefile <- saveRDS 
+    writefile <- saveRDS
   } else {
     box::use(qs)
-    readfile <- qs$qread 
+    readfile <- qs$qread
     writefile <- qs$qsave
   }
 
-  path <- file.path("cache", filename)
+  path <- if (fs::path_dir(filename) %in% c(".", getwd())) {
+    file.path("cache", filename)
+  } else {
+    filename
+  }
+  if (fs::is_link(path)) {
+    path <- fs::link_path(path)
+  }
+
   if (file.exists(path) && isFALSE(update)) {
       return(do.call(readfile, list(path)))
   }
 
   expressions <- substitute(expressions)
-  res <- eval.parent(expressions, n = 1)
+  env <- new.env(parent = parent.frame(n = 1))
+  res <- eval(expressions, envir = env)
   do.call(writefile, list(res, path))
+
   return(res)
 }
+
 
 #' Cache regression table
 #' @export
@@ -30,10 +43,10 @@ estout <- function(sourcefile, outfile = NULL, update = FALSE) {
 
   if (grepl("\\.rds$", outfile, ignore.case = TRUE)) {
     readfile <- readRDS
-    writefile <- saveRDS 
+    writefile <- saveRDS
   } else {
     box::use(qs)
-    readfile <- qs$qread 
+    readfile <- qs$qread
     writefile <- qs$qsave
   }
 
@@ -55,7 +68,8 @@ object_cachem <- function(name, expressions, cache, update) {
     }
 
     expressions <- substitute(expressions)
-    res <- eval.parent(expressions, n = 1)
+    env <- new.env(parent = parent.frame(n = 1))
+    res <- eval(expressions, envir = env)
     cache$set(name, res)
     return(res)
 }
@@ -67,7 +81,8 @@ object_environment <- function(name, expressions, env, update) {
   }
 
   expressions <- substitute(expressions)
-  res <- eval.parent(expressions, n = 1)
+  env <- new.env(parent = parent.frame(n = 1))
+  res <- eval(expressions, envir = env)
   assign(name, res, envir = env)
   return(res)
 }
@@ -76,9 +91,10 @@ object_environment <- function(name, expressions, env, update) {
 #' @export
 object <- function(name, expressions, cache = parent.frame(), update = FALSE) {
   if (inherits(cache, "cachem")) {
-    return(object_cachem(name, expressions, cache, update))
+    invisible(object_cachem(name, expressions, cache, update))
+  } else {
+    invisible(object_environment(name, expressions, cache, update))
   }
-  return(object_environment(name, expressions, cache, update))
 }
 
 
